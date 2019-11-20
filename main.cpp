@@ -11,6 +11,8 @@
 
 #include <string>
 #include <iostream>
+#include <unordered_set>
+#include <fstream>
 
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
@@ -20,7 +22,7 @@ using namespace std;
 
 const string HTTPMETHOD[6] = {"GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS"};
 const string HOSTPREFIX = "Host: ";
-string host;
+unordered_set<string> hostlist;
 ip* ip_header;
 tcphdr* tcp_header;
 
@@ -132,8 +134,8 @@ static u_int32_t print_pkt (struct nfq_data *tb, bool &flag)
 		if(isWrite) myhost += data[i];
 	}
 
-	flag = (host != myhost);
-	
+	flag = (hostlist.find(myhost) == hostlist.end());
+	if(!flag) cout << myhost << " rejected\n";
 	return id;
 }
 	
@@ -148,8 +150,8 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 }
 
 void usage() {
-	printf("syntax : netfilter_block <host>\n");
-	printf("sample : netfilter_block test.gilgil.net\n");
+	printf("syntax : 1m_block <input file>\n");
+	printf("sample : 1m_block top-1m.txt\n");
 }
 
 int main(int argc, char **argv)
@@ -161,10 +163,17 @@ int main(int argc, char **argv)
 
 	ip_header = (ip*) malloc(sizeof(ip));
 	tcp_header = (tcphdr*) malloc(sizeof(tcphdr));
-	host = argv[1];
+	ifstream fin(argv[1], ios::in);
+	if(!fin.is_open()) {
+		fprintf(stderr, "error during file open\n");
+		exit(1);
+	}
 
-	printf("host : %s, %s\n", host, argv[1]);
-	cout << host << '\n';
+	while(!fin.eof()) {
+		string str = "";
+		fin >> str;
+		hostlist.insert(str);
+	}
 
 	struct nfq_handle *h;
 	struct nfq_q_handle *qh;
